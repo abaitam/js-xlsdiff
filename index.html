@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<link rel="stylesheet" type="text/css" href="diffview.css" />
+<style>
+#dropold,#dropnew {
+	border:2px dashed #bbb;
+	-moz-border-radius:5px;
+	-webkit-border-radius:5px;
+	border-radius:5px;
+	padding:25px;
+	text-align:center;
+	font:20pt bold,"Vollkorn";color:#bbb;
+	width:41%;
+}
+#dropold { float: left; }
+#dropnew { float: right; }
+#buf { clear:both; }
+</style>
+<b>JS-XLSDIFF Live Demo</b><br />
+<a href="https://github.com/SheetJS/js-xlsdiff">Github Repo</a><br />
+<a href="https://github.com/austincheney/jsdifflib">Source for diff engine (h/t austincheney)</a><br />
+<a href="https://github.com/SheetJS/js-xlsdiff/issues">Issues?  Something look weird?  Click here and report an issue</a><br />
+<b>Drop XLS or XLSX files into the left and right box to see a diff</b><br />
+<div id="dropold">OLD</div>
+<div id="dropnew">NEW</div>
+<div id="buf">
+</div>
+<div id="diffoutput"></pre>
+<br />
+<script src="jszip.js"></script>
+<script src="xls.js"></script>
+<script src="xlsx.js"></script>
+<script src="shim.js"></script>
+<script src="difflib.js"></script>
+<script src="diffview.js"></script>
+<script>
+function to_formulae(workbook) {
+	var result = [];
+	workbook.SheetNames.forEach(function(sheetName) {
+		//var formulae = XLSX.utils.get_formulae(workbook.Sheets[sheetName]);
+		var formulae = get_formulae(workbook.Sheets[sheetName]);
+		if(formulae.length > 0){
+			result.push("SHEET: " + sheetName);
+			result.push("");
+			result.push(formulae.join("\n"));
+		}
+	});
+	return result.join("\n");
+}
+
+var o,n;
+
+
+function process_wb(wb, type) {
+	var output = "";
+	output = to_formulae(wb);
+	if(type == "old") o = output;
+	else n = output;
+	if(o && n) {
+		do_diff();
+	}
+}
+
+var dropold = document.getElementById('dropold');
+var dropnew = document.getElementById('dropnew');
+
+function handleDropOld(e) {
+	e.stopPropagation();
+	e.preventDefault();
+	var files = e.dataTransfer.files;
+	var i,f;
+	for (i = 0, f = files[i]; i != files.length; ++i) {
+		var reader = new FileReader();
+		var name = f.name;
+		reader.onload = function(e) {
+			var data = e.target.result;
+			var wb;
+			if(btoa(data[0]) === "0A=="){ // xls
+				wb = XLS.read(data, {type: 'binary'});
+			}
+			else if(data[0] === 'P') { //xlsx
+				wb = XLSX.read(data, {type: 'binary'});
+			} else {
+				out.innerText = "Cannot process file";
+			}
+			process_wb(wb, "old");
+		};
+		reader.readAsBinaryString(f);
+	}
+}
+
+function handleDropNew(e) {
+	e.stopPropagation();
+	e.preventDefault();
+	var files = e.dataTransfer.files;
+	var i,f;
+	for (i = 0, f = files[i]; i != files.length; ++i) {
+		var reader = new FileReader();
+		var name = f.name;
+		reader.onload = function(e) {
+			var data = e.target.result;
+			var wb;
+			if(btoa(data[0]) === "0A=="){ // xls
+				wb = XLS.read(data, {type: 'binary'});
+			}
+			else if(data[0] === 'P') { //xlsx
+				wb = XLSX.read(data, {type: 'binary'});
+			} else {
+				out.innerText = "Cannot process file";
+			}
+			process_wb(wb, "new");
+		};
+		reader.readAsBinaryString(f);
+	}
+}
+
+function handleDragover(e) {
+	e.stopPropagation();
+	e.preventDefault();
+	e.dataTransfer.dropEffect = 'copy';
+}
+
+if(dropold.addEventListener) {
+	dropold.addEventListener('dragenter', handleDragover, false);
+	dropold.addEventListener('dragover', handleDragover, false);
+	dropnew.addEventListener('dragenter', handleDragover, false);
+	dropnew.addEventListener('dragover', handleDragover, false);
+	dropold.addEventListener('drop', handleDropOld, false);
+	dropnew.addEventListener('drop', handleDropNew, false);
+}
+
+function do_diff() {
+	var base = o;
+	var newtxt = n;
+	var sm = new difflib.SequenceMatcher(base, newtxt);
+	var opcodes = sm.get_opcodes();
+	console.log(opcodes);
+	var diffoutputdiv = document.getElementById("diffoutput");
+	console.log(diffoutputdiv);
+	var contextSize = 100;
+	console.error(diffoutputdiv);
+	var x = (diffview({ baseTextLines:base,
+												   newTextLines:newtxt,
+												   opcodes:opcodes,
+												   baseTextName:"Base Text",
+												   newTextName:"New Text",
+												   contextSize:contextSize,
+												   viewType: 0 }));
+	diffoutputdiv.innerHTML = x.join("");
+}
+
+</script>
